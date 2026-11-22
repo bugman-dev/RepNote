@@ -34,9 +34,6 @@ export function OptionsDrawer({
           >
             <Text style={styles.itemLabel}>Manage workout names</Text>
           </Pressable>
-          <Text style={styles.help}>
-            Add names once; they will appear in the Workout dropdown.
-          </Text>
         </View>
       </View>
     </Modal>
@@ -99,11 +96,5 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
     color: colors.ink,
-  },
-  help: {
-    marginTop: 14,
-    color: colors.muted,
-    fontSize: 15,
-    lineHeight: 22,
   },
 });

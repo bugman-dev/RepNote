@@ -27,7 +27,7 @@ export function TodaysListPanel() {
       const result = await exportSession();
       if (!result.cancelled) {
         setStatusIsError(false);
-        setStatus('Text file ready');
+        setStatus('Text file saved');
       }
     } catch (error) {
       setStatusIsError(true);
@@ -70,7 +70,14 @@ export function TodaysListPanel() {
         <Text style={styles.exportLabel}>{exporting ? 'Saving…' : 'Export today as .txt'}</Text>
       </Pressable>
       {status ? (
-        <Text style={[styles.status, statusIsError && styles.statusError]}>{status}</Text>
+        statusIsError ? (
+          <Text style={[styles.status, styles.statusError]}>{status}</Text>
+        ) : (
+          <View style={styles.statusRow}>
+            <Text style={styles.tick}>✓</Text>
+            <Text style={styles.status}>{status}</Text>
+          </View>
+        )
       ) : null}
 
       <View style={styles.preview}>
@@ -180,13 +187,26 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontWeight: '700',
   },
-  status: {
+  statusRow: {
     marginTop: 10,
-    textAlign: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  tick: {
+    color: colors.green,
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  status: {
     color: colors.pillText,
     fontSize: 14,
+    fontWeight: '600',
   },
   statusError: {
+    marginTop: 10,
+    textAlign: 'center',
     color: colors.danger,
   },
   preview: {
