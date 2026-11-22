@@ -17,6 +17,21 @@ import { addSet as insertSet, findSession, insertWorkout, listSets, listWorkouts
 import { saveTextFile } from '../export/saveTextFile';
 
 type Screen = 'session' | 'workouts';
+type SessionStatus = 'loading' | 'ready' | 'error';
+
+const SESSION_LOAD_ERROR = 'Could not load sets for this day.';
+const WORKOUT_LOAD_ERROR = 'Could not load workout names.';
+
+type SessionView = {
+  key: string;
+  status: SessionStatus;
+  error: string | null;
+  sets: SetEntry[];
+};
+
+function sessionKey(day: number, date: string): string {
+  return `${day}|${date}`;
+}
 
 type SessionContextValue = {
   routineDay: number;
@@ -25,6 +40,9 @@ type SessionContextValue = {
   selectedWorkoutId: number | null;
   person: Person;
   sets: SetEntry[];
+  sessionStatus: SessionStatus;
+  sessionError: string | null;
+  workoutError: string | null;
   screen: Screen;
   drawerOpen: boolean;
   setRoutineDay: (day: number) => void;
@@ -34,6 +52,8 @@ type SessionContextValue = {
   addSet: (values: SetValues) => Promise<void>;
   addWorkout: (name: string) => Promise<{ error?: string }>;
   exportSession: () => Promise<{ cancelled: boolean }>;
+  reloadSession: () => Promise<void>;
+  reloadWorkouts: () => Promise<void>;
   openDrawer: () => void;
   closeDrawer: () => void;
   showWorkouts: () => void;
@@ -59,7 +79,8 @@ export function SessionProvider({
   const [workouts, setWorkouts] = useState<Workout[]>([]);
   const [selectedWorkoutId, setSelectedWorkoutId] = useState<number | null>(null);
   const [person, setPerson] = useState<Person>('thejus');
-  const [sets, setSets] = useState<SetEntry[]>([]);
+  const [sessionView, setSessionView] = useState<SessionView | null>(null);
+  const [workoutError, setWorkoutError] = useState<string | null>(null);
   const [screen, setScreen] = useState<Screen>('session');
   const [drawerOpen, setDrawerOpen] = useState(false);
   const selection = useRef<Selection>({ routineDay: 1, sessionDate: todayIso() });
@@ -67,6 +88,18 @@ export function SessionProvider({
   const queue = useRef(Promise.resolve());
 
   selection.current = { routineDay, sessionDate };
+  const selectionKey = sessionKey(routineDay, sessionDate);
+  if (sessionView?.key !== selectionKey) {
+    setSessionView({
+      key: selectionKey,
+      status: 'loading',
+      error: null,
+      sets: [],
+    });
+  }
+  const sets = sessionView?.key === selectionKey ? sessionView.sets : [];
+  const sessionStatus: SessionStatus = sessionView?.key === selectionKey ? sessionView.status : 'loading';
+  const sessionError = sessionView?.key === selectionKey ? sessionView.error : null;
 
   const enqueue = useCallback(<T,>(task: () => Promise<T>): Promise<T> => {
     const run = queue.current.then(task, task);
@@ -77,43 +110,79 @@ export function SessionProvider({
     return run;
   }, []);
 
+  const applyWorkouts = useCallback((rows: Workout[]) => {
+    setWorkouts(rows);
+    setSelectedWorkoutId((current) => {
+      if (current != null && rows.some((row) => row.id === current)) {
+        return current;
+      }
+      return rows[0]?.id ?? null;
+    });
+    setWorkoutError(null);
+  }, []);
+
+  const reloadWorkouts = useCallback(async () => {
+    try {
+      applyWorkouts(await listWorkouts(db));
+    } catch {
+      setWorkoutError(WORKOUT_LOAD_ERROR);
+    }
+  }, [applyWorkouts, db]);
+
   const loadSession = useCallback(
     async (day: number, date: string) => {
       const id = ++loadId.current;
-      const session = await findSession(db, day, date);
-      const nextSets = session ? await listSets(db, session.id) : [];
-      if (loadId.current !== id) {
-        return;
+      const key = sessionKey(day, date);
+      setSessionView((current) => ({
+        key,
+        status: 'loading',
+        error: null,
+        sets: current?.key === key ? current.sets : [],
+      }));
+      try {
+        const session = await findSession(db, day, date);
+        const nextSets = session ? await listSets(db, session.id) : [];
+        if (loadId.current !== id) {
+          return;
+        }
+        setSessionView({ key, status: 'ready', error: null, sets: nextSets });
+      } catch {
+        if (loadId.current !== id) {
+          return;
+        }
+        setSessionView((current) => ({
+          key,
+          status: 'error',
+          error: SESSION_LOAD_ERROR,
+          sets: current?.key === key ? current.sets : [],
+        }));
       }
-      setSets(nextSets);
     },
     [db],
+  );
+
+  const reloadSession = useCallback(
+    () => loadSession(routineDay, sessionDate),
+    [loadSession, routineDay, sessionDate],
   );
 
   useEffect(() => {
     let cancelled = false;
     listWorkouts(db)
       .then((rows) => {
-        if (cancelled) {
-          return;
+        if (!cancelled) {
+          applyWorkouts(rows);
         }
-        setWorkouts(rows);
-        setSelectedWorkoutId((current) => {
-          if (current != null && rows.some((row) => row.id === current)) {
-            return current;
-          }
-          return rows[0]?.id ?? null;
-        });
       })
       .catch(() => {
         if (!cancelled) {
-          setWorkouts([]);
+          setWorkoutError(WORKOUT_LOAD_ERROR);
         }
       });
     return () => {
       cancelled = true;
     };
-  }, [db]);
+  }, [applyWorkouts, db]);
 
   useEffect(() => {
     void loadSession(routineDay, sessionDate);
@@ -172,10 +241,13 @@ export function SessionProvider({
   );
 
   const exportSession = useCallback(async () => {
+    if (sessionStatus !== 'ready') {
+      throw new Error(sessionError ?? 'This day is still loading.');
+    }
     const contents = formatSessionExport(routineDay, sessionDate, sets);
     const fileName = exportFileName(routineDay, sessionDate);
     return saveTextFile(fileName, contents);
-  }, [routineDay, sessionDate, sets]);
+  }, [routineDay, sessionDate, sessionError, sessionStatus, sets]);
 
   const openDrawer = useCallback(() => setDrawerOpen(true), []);
   const closeDrawer = useCallback(() => setDrawerOpen(false), []);
@@ -193,6 +265,9 @@ export function SessionProvider({
       selectedWorkoutId,
       person,
       sets,
+      sessionStatus,
+      sessionError,
+      workoutError,
       screen,
       drawerOpen,
       setRoutineDay,
@@ -202,6 +277,8 @@ export function SessionProvider({
       addSet,
       addWorkout,
       exportSession,
+      reloadSession,
+      reloadWorkouts,
       openDrawer,
       closeDrawer,
       showWorkouts,
@@ -215,6 +292,11 @@ export function SessionProvider({
       exportSession,
       openDrawer,
       person,
+      reloadSession,
+      reloadWorkouts,
+      sessionError,
+      sessionStatus,
+      workoutError,
       routineDay,
       screen,
       selectedWorkoutId,

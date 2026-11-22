@@ -7,18 +7,24 @@ import { useSession } from '../state/SessionStore';
 import { colors, radius } from '../theme';
 
 export function TodaysListPanel() {
-  const { routineDay, sessionDate, sets, exportSession } = useSession();
+  const { routineDay, sessionDate, sets, sessionStatus, exportSession } = useSession();
   const [exporting, setExporting] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
   const [statusIsError, setStatusIsError] = useState(false);
   const groups = groupSets(sets);
   const preview = formatSessionExport(routineDay, sessionDate, sets);
-  const summary = `${groups.length} ${groups.length === 1 ? 'exercise' : 'exercises'} · ${sets.length} ${
-    sets.length === 1 ? 'set' : 'sets'
-  }`;
+  const canExport = sessionStatus === 'ready' && !exporting;
+  const awaitingSets = sets.length === 0 && sessionStatus !== 'ready';
+  const summary = awaitingSets
+    ? sessionStatus === 'loading'
+      ? 'Loading…'
+      : ''
+    : `${groups.length} ${groups.length === 1 ? 'exercise' : 'exercises'} · ${sets.length} ${
+        sets.length === 1 ? 'set' : 'sets'
+      }`;
 
   const onExport = async () => {
-    if (exporting) {
+    if (exporting || sessionStatus !== 'ready') {
       return;
     }
     setExporting(true);
@@ -44,30 +50,36 @@ export function TodaysListPanel() {
         <Text style={styles.summary}>{summary}</Text>
       </View>
 
-      {groups.length === 0 ? (
+      {sessionStatus === 'loading' && sets.length === 0 ? (
+        <Text style={styles.empty}>Loading this day…</Text>
+      ) : null}
+      {sessionStatus === 'ready' && groups.length === 0 ? (
         <Text style={styles.empty}>No sets for this day yet.</Text>
-      ) : (
-        groups.map((group) => (
-          <View key={group.workoutId} style={styles.group}>
-            <View style={styles.groupHeader}>
-              <Text style={styles.workout}>{group.name}</Text>
-              <Text style={styles.count}>
-                {group.sets.length} {group.sets.length === 1 ? 'set' : 'sets'}
-              </Text>
-            </View>
-            <PersonBlock person="thejus" sets={setsForPerson(group.sets, 'thejus')} />
-            <PersonBlock person="lekshmi" sets={setsForPerson(group.sets, 'lekshmi')} />
+      ) : null}
+      {groups.map((group) => (
+        <View key={group.workoutId} style={styles.group}>
+          <View style={styles.groupHeader}>
+            <Text style={styles.workout}>{group.name}</Text>
+            <Text style={styles.count}>
+              {group.sets.length} {group.sets.length === 1 ? 'set' : 'sets'}
+            </Text>
           </View>
-        ))
-      )}
+          <PersonBlock person="thejus" sets={setsForPerson(group.sets, 'thejus')} />
+          <PersonBlock person="lekshmi" sets={setsForPerson(group.sets, 'lekshmi')} />
+        </View>
+      ))}
 
       <Pressable
         accessibilityRole="button"
         accessibilityLabel="Export today as text"
+        accessibilityState={{ disabled: !canExport }}
+        disabled={!canExport}
         onPress={() => void onExport()}
-        style={[styles.exportButton, exporting && styles.exportBusy]}
+        style={[styles.exportButton, !canExport && styles.exportBusy]}
       >
-        <Text style={styles.exportLabel}>{exporting ? 'Saving…' : 'Export today as .txt'}</Text>
+        <Text style={styles.exportLabel}>
+          {exporting ? 'Saving…' : sessionStatus === 'loading' ? 'Loading…' : 'Export today as .txt'}
+        </Text>
       </Pressable>
       {status ? (
         statusIsError ? (
@@ -80,10 +92,12 @@ export function TodaysListPanel() {
         )
       ) : null}
 
-      <View style={styles.preview}>
-        <Text style={styles.previewLabel}>Text file preview</Text>
-        <Text style={styles.previewBody}>{preview}</Text>
-      </View>
+      {sessionStatus === 'ready' ? (
+        <View style={styles.preview}>
+          <Text style={styles.previewLabel}>Text file preview</Text>
+          <Text style={styles.previewBody}>{preview}</Text>
+        </View>
+      ) : null}
     </View>
   );
 }

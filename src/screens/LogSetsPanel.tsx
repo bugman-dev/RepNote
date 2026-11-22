@@ -15,6 +15,7 @@ export function LogSetsPanel() {
     person,
     setPerson,
     sets,
+    sessionStatus,
     addSet,
   } = useSession();
   const [weight, setWeight] = useState('');
@@ -26,9 +27,13 @@ export function LogSetsPanel() {
 
   const upcoming = nextSetNumber(sets, selectedWorkoutId, person);
   const loggedLabel =
-    sets.length === 0
-      ? 'No sets logged · tap to add the next set'
-      : `${sets.length} ${sets.length === 1 ? 'set' : 'sets'} logged · tap to add the next set`;
+    sessionStatus === 'loading' && sets.length === 0
+      ? 'Loading sets…'
+      : sessionStatus === 'error' && sets.length === 0
+        ? 'Sets for this day could not be loaded'
+        : sets.length === 0
+          ? 'No sets logged · tap to add the next set'
+          : `${sets.length} ${sets.length === 1 ? 'set' : 'sets'} logged · tap to add the next set`;
 
   const onAdd = async () => {
     if (saving) {
