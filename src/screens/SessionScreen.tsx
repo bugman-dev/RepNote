@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import Constants from 'expo-constants';
 import { DateField } from '../components/DateField';
 import { DropdownField } from '../components/DropdownField';
 import { SegmentedTabs } from '../components/SegmentedTabs';
@@ -36,7 +37,9 @@ export function SessionScreen() {
       </View>
       <SegmentedTabs value={tab} onChange={setTab} />
       {tab === 'log' ? <LogSetsPanel /> : <TodaysListPanel />}
-      <Text style={styles.footer}>Saved on this device · no typing workout names</Text>
+      <Text style={styles.footer}>
+        Rep Note · App Version {Constants.expoConfig?.version}
+      </Text>
     </ScrollView>
   );
 }
