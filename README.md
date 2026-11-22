@@ -1,6 +1,6 @@
 # Rep Note
 
-Rep Note is a small Android app for logging gym sets. It is for Thejus and Lekshmi, and it is meant to stay out of the way during a workout: pick the exercise, enter the numbers, and move on.
+Rep Note is a small Android app for logging gym sets.It is meant to stay out of the way during a workout: pick the exercise, enter the numbers, and move on.
 
 The app follows an eight-day training cycle. Each session is a routine day (Day 01 through Day 08) on a calendar date. Sets are stored on the phone. Nothing is sent to a server, and there is no account.
 
