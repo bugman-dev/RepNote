@@ -38,7 +38,7 @@ export function SessionScreen() {
       <SegmentedTabs value={tab} onChange={setTab} />
       {tab === 'log' ? <LogSetsPanel /> : <TodaysListPanel />}
       <Text style={styles.footer}>
-        Rep Note · App Version {Constants.expoConfig?.version}
+        {Constants.expoConfig?.name} · App Version {Constants.expoConfig?.version}
       </Text>
     </ScrollView>
   );
