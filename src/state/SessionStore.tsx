@@ -12,22 +12,25 @@ import type { SQLiteDatabase } from 'expo-sqlite';
 import { todayIso } from '../domain/dates';
 import { exportFileName, formatSessionExport } from '../domain/formatExport';
 import type { Person, SetEntry, SetValues, Workout } from '../domain/types';
-import { validateWorkoutName } from '../domain/validation';
+import { validatePersonName, validateWorkoutName } from '../domain/validation';
 import {
   addSet as insertSet,
   deleteSet as removeSet,
   findSession,
+  insertPerson,
   insertWorkout,
+  listPeople,
   listSets,
   listWorkouts,
 } from '../data/repository';
 import { saveTextFile } from '../export/saveTextFile';
 
-type Screen = 'session' | 'workouts';
+type Screen = 'session' | 'workouts' | 'people';
 type SessionStatus = 'loading' | 'ready' | 'error';
 
 const SESSION_LOAD_ERROR = 'Could not load sets for this day.';
 const WORKOUT_LOAD_ERROR = 'Could not load workout names.';
+const PERSON_LOAD_ERROR = 'Could not load people.';
 
 type SessionView = {
   key: string;
@@ -44,27 +47,32 @@ type SessionContextValue = {
   routineDay: number;
   sessionDate: string;
   workouts: Workout[];
+  people: Person[];
   selectedWorkoutId: number | null;
-  person: Person;
+  selectedPersonId: number | null;
   sets: SetEntry[];
   sessionStatus: SessionStatus;
   sessionError: string | null;
   workoutError: string | null;
+  personError: string | null;
   screen: Screen;
   drawerOpen: boolean;
   setRoutineDay: (day: number) => void;
   setSessionDate: (isoDate: string) => void;
   setSelectedWorkoutId: (workoutId: number) => void;
-  setPerson: (person: Person) => void;
+  setSelectedPersonId: (personId: number) => void;
   addSet: (values: SetValues) => Promise<void>;
   deleteSet: (setId: number) => Promise<void>;
   addWorkout: (name: string) => Promise<{ error?: string }>;
+  addPerson: (name: string) => Promise<{ error?: string }>;
   exportSession: () => Promise<{ cancelled: boolean }>;
   reloadSession: () => Promise<void>;
   reloadWorkouts: () => Promise<void>;
+  reloadPeople: () => Promise<void>;
   openDrawer: () => void;
   closeDrawer: () => void;
   showWorkouts: () => void;
+  showPeople: () => void;
   showSession: () => void;
 };
 
@@ -85,10 +93,12 @@ export function SessionProvider({
   const [routineDay, setRoutineDay] = useState(1);
   const [sessionDate, setSessionDate] = useState(todayIso);
   const [workouts, setWorkouts] = useState<Workout[]>([]);
+  const [people, setPeople] = useState<Person[]>([]);
   const [selectedWorkoutId, setSelectedWorkoutId] = useState<number | null>(null);
-  const [person, setPerson] = useState<Person>('thejus');
+  const [selectedPersonId, setSelectedPersonId] = useState<number | null>(null);
   const [sessionView, setSessionView] = useState<SessionView | null>(null);
   const [workoutError, setWorkoutError] = useState<string | null>(null);
+  const [personError, setPersonError] = useState<string | null>(null);
   const [screen, setScreen] = useState<Screen>('session');
   const [drawerOpen, setDrawerOpen] = useState(false);
   const selection = useRef<Selection>({ routineDay: 1, sessionDate: todayIso() });
@@ -136,6 +146,25 @@ export function SessionProvider({
       setWorkoutError(WORKOUT_LOAD_ERROR);
     }
   }, [applyWorkouts, db]);
+
+  const applyPeople = useCallback((rows: Person[]) => {
+    setPeople(rows);
+    setSelectedPersonId((current) => {
+      if (current != null && rows.some((row) => row.id === current)) {
+        return current;
+      }
+      return rows[0]?.id ?? null;
+    });
+    setPersonError(null);
+  }, []);
+
+  const reloadPeople = useCallback(async () => {
+    try {
+      applyPeople(await listPeople(db));
+    } catch {
+      setPersonError(PERSON_LOAD_ERROR);
+    }
+  }, [applyPeople, db]);
 
   const loadSession = useCallback(
     async (day: number, date: string) => {
@@ -193,6 +222,24 @@ export function SessionProvider({
   }, [applyWorkouts, db]);
 
   useEffect(() => {
+    let cancelled = false;
+    listPeople(db)
+      .then((rows) => {
+        if (!cancelled) {
+          applyPeople(rows);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setPersonError(PERSON_LOAD_ERROR);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [applyPeople, db]);
+
+  useEffect(() => {
     void loadSession(routineDay, sessionDate);
   }, [loadSession, routineDay, sessionDate]);
 
@@ -201,16 +248,19 @@ export function SessionProvider({
       if (selectedWorkoutId == null) {
         throw new Error('Choose a workout');
       }
+      if (selectedPersonId == null) {
+        throw new Error('Choose a person');
+      }
       const day = routineDay;
       const date = sessionDate;
       const workoutId = selectedWorkoutId;
-      const selectedPerson = person;
+      const personId = selectedPersonId;
       await enqueue(async () => {
         await insertSet(db, {
           routineDay: day,
           sessionDate: date,
           workoutId,
-          person: selectedPerson,
+          personId,
           ...values,
         });
         const current = selection.current;
@@ -219,7 +269,7 @@ export function SessionProvider({
         }
       });
     },
-    [db, enqueue, loadSession, person, routineDay, selectedWorkoutId, sessionDate],
+    [db, enqueue, loadSession, routineDay, selectedPersonId, selectedWorkoutId, sessionDate],
   );
 
   const deleteSet = useCallback(
@@ -263,6 +313,32 @@ export function SessionProvider({
     [db, enqueue, workouts],
   );
 
+  const addPerson = useCallback(
+    async (name: string) => {
+      const check = validatePersonName(
+        name,
+        people.map((person) => person.normalizedName),
+      );
+      if (!check.name) {
+        return { error: check.error ?? 'Enter a person name' };
+      }
+      const savedName = check.name;
+      try {
+        const person = await enqueue(() => insertPerson(db, savedName));
+        setPeople((current) => [...current, person]);
+        setSelectedPersonId((current) => current ?? person.id);
+        return {};
+      } catch (error) {
+        const message = error instanceof Error ? error.message : '';
+        if (message.toLowerCase().includes('unique')) {
+          return { error: 'That person name already exists' };
+        }
+        return { error: 'Could not save that person name' };
+      }
+    },
+    [db, enqueue, people],
+  );
+
   const exportSession = useCallback(async () => {
     if (sessionStatus !== 'ready') {
       throw new Error(sessionError ?? 'This day is still loading.');
@@ -278,6 +354,10 @@ export function SessionProvider({
     setDrawerOpen(false);
     setScreen('workouts');
   }, []);
+  const showPeople = useCallback(() => {
+    setDrawerOpen(false);
+    setScreen('people');
+  }, []);
   const showSession = useCallback(() => setScreen('session'), []);
 
   const value = useMemo<SessionContextValue>(
@@ -285,50 +365,60 @@ export function SessionProvider({
       routineDay,
       sessionDate,
       workouts,
+      people,
       selectedWorkoutId,
-      person,
+      selectedPersonId,
       sets,
       sessionStatus,
       sessionError,
       workoutError,
+      personError,
       screen,
       drawerOpen,
       setRoutineDay,
       setSessionDate,
       setSelectedWorkoutId,
-      setPerson,
+      setSelectedPersonId,
       addSet,
       deleteSet,
       addWorkout,
+      addPerson,
       exportSession,
       reloadSession,
       reloadWorkouts,
+      reloadPeople,
       openDrawer,
       closeDrawer,
       showWorkouts,
+      showPeople,
       showSession,
     }),
     [
+      addPerson,
       addSet,
       addWorkout,
-      deleteSet,
       closeDrawer,
+      deleteSet,
       drawerOpen,
       exportSession,
       openDrawer,
-      person,
+      people,
+      personError,
+      reloadPeople,
       reloadSession,
       reloadWorkouts,
-      sessionError,
-      sessionStatus,
-      workoutError,
       routineDay,
       screen,
+      selectedPersonId,
       selectedWorkoutId,
       sessionDate,
+      sessionError,
+      sessionStatus,
       sets,
+      showPeople,
       showSession,
       showWorkouts,
+      workoutError,
       workouts,
     ],
   );

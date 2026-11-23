@@ -4,11 +4,13 @@ import { AppHeader } from '../components/AppHeader';
 import { OptionsDrawer } from '../components/OptionsDrawer';
 import { useSession } from '../state/SessionStore';
 import { colors } from '../theme';
+import { ManagePeopleScreen } from './ManagePeopleScreen';
 import { ManageWorkoutsScreen } from './ManageWorkoutsScreen';
 import { SessionScreen } from './SessionScreen';
 
 export function Root() {
-  const { screen, drawerOpen, openDrawer, closeDrawer, showWorkouts, showSession } = useSession();
+  const { screen, drawerOpen, openDrawer, closeDrawer, showWorkouts, showPeople, showSession } =
+    useSession();
   const topInset = Platform.OS === 'android' ? (NativeStatusBar.currentHeight ?? 0) : 16;
 
   useEffect(() => {
@@ -17,7 +19,7 @@ export function Root() {
         closeDrawer();
         return true;
       }
-      if (screen === 'workouts') {
+      if (screen === 'workouts' || screen === 'people') {
         showSession();
         return true;
       }
@@ -29,8 +31,19 @@ export function Root() {
   return (
     <View style={[styles.root, { paddingTop: topInset }]}>
       <AppHeader onPressMenu={openDrawer} />
-      {screen === 'workouts' ? <ManageWorkoutsScreen /> : <SessionScreen />}
-      <OptionsDrawer visible={drawerOpen} onClose={closeDrawer} onManageWorkouts={showWorkouts} />
+      {screen === 'workouts' ? (
+        <ManageWorkoutsScreen />
+      ) : screen === 'people' ? (
+        <ManagePeopleScreen />
+      ) : (
+        <SessionScreen />
+      )}
+      <OptionsDrawer
+        visible={drawerOpen}
+        onClose={closeDrawer}
+        onManageWorkouts={showWorkouts}
+        onManagePeople={showPeople}
+      />
     </View>
   );
 }

@@ -1,5 +1,6 @@
 import { formatLongDate } from './dates';
-import { formatDayLabel, personLabel, type Person, type SetEntry } from './types';
+import { listedPeople } from './sessionView';
+import { formatDayLabel, type SetEntry } from './types';
 
 export function ordinal(value: number): string {
   const mod100 = value % 100;
@@ -71,13 +72,12 @@ export function formatSessionExport(
 
 function formatWorkoutBlock(block: WorkoutBlock): string {
   const lines: string[] = [block.name, ''];
-  const people: Person[] = ['thejus', 'lekshmi'];
-  const present = people.filter((person) => block.sets.some((set) => set.person === person));
+  const present = listedPeople(block.sets);
 
   present.forEach((person, index) => {
-    lines.push(personLabel(person));
+    lines.push(person.name);
     const personSets = block.sets
-      .filter((set) => set.person === person)
+      .filter((set) => set.personId === person.id)
       .sort((a, b) => a.setNumber - b.setNumber);
     for (const set of personSets) {
       lines.push(formatSetLine(set));

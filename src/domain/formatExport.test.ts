@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { exportFileName, formatSessionExport, formatSetLine, ordinal } from './formatExport';
-import type { Person, SetEntry } from './types';
+import type { SetEntry } from './types';
 
 const sessionDate = '2026-11-18';
 
@@ -9,7 +9,8 @@ function entry(values: {
   id: number;
   workoutId: number;
   workoutName: string;
-  person: Person;
+  personId: number;
+  personName: string;
   setNumber: number;
   weightKg?: number;
   reps?: number;
@@ -20,7 +21,8 @@ function entry(values: {
     sessionId: 1,
     workoutId: values.workoutId,
     workoutName: values.workoutName,
-    person: values.person,
+    personId: values.personId,
+    personName: values.personName,
     setNumber: values.setNumber,
     weightKg: values.weightKg ?? 25,
     reps: values.reps ?? 10,
@@ -66,23 +68,36 @@ describe('formatSessionExport', () => {
     );
   });
 
-  it('orders workouts by the first logged set, Thejus before Lekshmi, and skips an absent person', () => {
+  it('orders workouts by the first logged set and people by the order they were added', () => {
     const text = formatSessionExport(1, sessionDate, [
       entry({
         id: 10,
         workoutId: 2,
         workoutName: 'Press',
-        person: 'lekshmi',
+        personId: 2,
+        personName: 'Lekshmi',
         setNumber: 1,
         weightKg: 15,
         reps: 12,
         rir: 0,
       }),
       entry({
+        id: 1,
+        workoutId: 1,
+        workoutName: 'Fly',
+        personId: 3,
+        personName: 'Alex',
+        setNumber: 1,
+        weightKg: 12,
+        reps: 8,
+        rir: 1,
+      }),
+      entry({
         id: 4,
         workoutId: 1,
         workoutName: 'Fly',
-        person: 'thejus',
+        personId: 1,
+        personName: 'Thejus',
         setNumber: 2,
         reps: 18,
         rir: 1,
@@ -91,7 +106,8 @@ describe('formatSessionExport', () => {
         id: 3,
         workoutId: 1,
         workoutName: 'Fly',
-        person: 'lekshmi',
+        personId: 2,
+        personName: 'Lekshmi',
         setNumber: 1,
         weightKg: 10.5,
         reps: 12,
@@ -101,7 +117,8 @@ describe('formatSessionExport', () => {
         id: 2,
         workoutId: 1,
         workoutName: 'Fly',
-        person: 'thejus',
+        personId: 1,
+        personName: 'Thejus',
         setNumber: 1,
         reps: 20,
         rir: 2,
@@ -121,6 +138,9 @@ describe('formatSessionExport', () => {
         '',
         'Lekshmi',
         '1st set - 10.5 kg - 12 reps - 0 rir',
+        '',
+        'Alex',
+        '1st set - 12 kg - 8 reps - 1 rir',
         '',
         'Press',
         '',

@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { formatSessionExport, formatSetLine } from '../domain/formatExport';
-import { groupSets, setsForPerson } from '../domain/sessionView';
-import { personLabel, type Person, type SetEntry } from '../domain/types';
+import { groupSets, listedPeople, setsForPerson } from '../domain/sessionView';
+import { type SetEntry } from '../domain/types';
 import { useSession } from '../state/SessionStore';
 import { colors, radius } from '../theme';
 
@@ -91,18 +91,15 @@ export function TodaysListPanel() {
               {group.sets.length} {group.sets.length === 1 ? 'set' : 'sets'}
             </Text>
           </View>
-          <PersonBlock
-            person="thejus"
-            sets={setsForPerson(group.sets, 'thejus')}
-            deletingId={deletingId}
-            onDelete={onDelete}
-          />
-          <PersonBlock
-            person="lekshmi"
-            sets={setsForPerson(group.sets, 'lekshmi')}
-            deletingId={deletingId}
-            onDelete={onDelete}
-          />
+          {listedPeople(group.sets).map((person) => (
+            <PersonBlock
+              key={person.id}
+              name={person.name}
+              sets={setsForPerson(group.sets, person.id)}
+              deletingId={deletingId}
+              onDelete={onDelete}
+            />
+          ))}
         </View>
       ))}
       {deleteError ? <Text style={styles.deleteError}>{deleteError}</Text> : null}
@@ -173,12 +170,12 @@ export function TodaysListPanel() {
 }
 
 function PersonBlock({
-  person,
+  name,
   sets,
   deletingId,
   onDelete,
 }: {
-  person: Person;
+  name: string;
   sets: ReturnType<typeof setsForPerson>;
   deletingId: number | null;
   onDelete: (set: SetEntry) => void;
@@ -188,7 +185,7 @@ function PersonBlock({
   }
   return (
     <View style={styles.personBlock}>
-      <Text style={styles.person}>{personLabel(person)}</Text>
+      <Text style={styles.person}>{name}</Text>
       {sets.map((set) => (
         <View key={set.id} style={styles.setRow}>
           <Text style={styles.setLine}>{formatSetLine(set)}</Text>

@@ -1,4 +1,4 @@
-import type { Person, SetEntry } from './types';
+import type { SetEntry } from './types';
 
 export type WorkoutGroup = {
   workoutId: number;
@@ -6,16 +6,21 @@ export type WorkoutGroup = {
   sets: SetEntry[];
 };
 
+export type ListedPerson = {
+  id: number;
+  name: string;
+};
+
 export function nextSetNumber(
   sets: SetEntry[],
   workoutId: number | null,
-  person: Person,
+  personId: number | null,
 ): number {
-  if (workoutId == null) {
+  if (workoutId == null || personId == null) {
     return 1;
   }
   const numbers = sets
-    .filter((set) => set.workoutId === workoutId && set.person === person)
+    .filter((set) => set.workoutId === workoutId && set.personId === personId)
     .map((set) => set.setNumber);
   if (numbers.length === 0) {
     return 1;
@@ -41,8 +46,20 @@ export function groupSets(sets: SetEntry[]): WorkoutGroup[] {
   return groups;
 }
 
-export function setsForPerson(sets: SetEntry[], person: Person): SetEntry[] {
+export function listedPeople(sets: SetEntry[]): ListedPerson[] {
+  const people = new Map<number, string>();
+  for (const set of sets) {
+    if (!people.has(set.personId)) {
+      people.set(set.personId, set.personName);
+    }
+  }
+  return [...people.entries()]
+    .sort((a, b) => a[0] - b[0])
+    .map(([id, name]) => ({ id, name }));
+}
+
+export function setsForPerson(sets: SetEntry[], personId: number): SetEntry[] {
   return sets
-    .filter((set) => set.person === person)
+    .filter((set) => set.personId === personId)
     .sort((a, b) => a.setNumber - b.setNumber);
 }

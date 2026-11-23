@@ -18,8 +18,10 @@ export function SessionScreen() {
     setSessionDate,
     sessionError,
     workoutError,
+    personError,
     reloadSession,
     reloadWorkouts,
+    reloadPeople,
   } = useSession();
   const [tab, setTab] = useState<'log' | 'today'>('log');
 
@@ -46,6 +48,9 @@ export function SessionScreen() {
       </View>
       {workoutError ? (
         <LoadNotice message={workoutError} onRetry={() => void reloadWorkouts()} />
+      ) : null}
+      {personError ? (
+        <LoadNotice message={personError} onRetry={() => void reloadPeople()} />
       ) : null}
       {sessionError ? (
         <LoadNotice message={sessionError} onRetry={() => void reloadSession()} />

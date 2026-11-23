@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { DropdownField } from '../components/DropdownField';
 import { nextSetNumber } from '../domain/sessionView';
-import { PEOPLE, personLabel } from '../domain/types';
 import { validateSetInput, type SetFieldErrors } from '../domain/validation';
 import { useSession } from '../state/SessionStore';
 import { colors, radius } from '../theme';
@@ -12,8 +11,9 @@ export function LogSetsPanel() {
     workouts,
     selectedWorkoutId,
     setSelectedWorkoutId,
-    person,
-    setPerson,
+    people,
+    selectedPersonId,
+    setSelectedPersonId,
     sets,
     sessionStatus,
     addSet,
@@ -25,7 +25,8 @@ export function LogSetsPanel() {
   const [formError, setFormError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
-  const upcoming = nextSetNumber(sets, selectedWorkoutId, person);
+  const selectedPerson = people.find((item) => item.id === selectedPersonId) ?? null;
+  const upcoming = nextSetNumber(sets, selectedWorkoutId, selectedPersonId);
   const loggedLabel =
     sessionStatus === 'loading' && sets.length === 0
       ? 'Loading sets…'
@@ -41,6 +42,10 @@ export function LogSetsPanel() {
     }
     if (selectedWorkoutId == null) {
       setFormError('Choose a workout');
+      return;
+    }
+    if (selectedPersonId == null) {
+      setFormError('Choose a person');
       return;
     }
     const result = validateSetInput({ weight, reps, rir });
@@ -84,15 +89,19 @@ export function LogSetsPanel() {
       <View style={styles.gap} />
       <DropdownField
         label="PERSON"
-        value={person}
-        placeholder="Thejus"
-        emptyText=""
-        options={PEOPLE.map((item) => ({ value: item.id, label: item.label }))}
-        onChange={(value) => setPerson(value === 'lekshmi' ? 'lekshmi' : 'thejus')}
+        value={selectedPersonId == null ? null : String(selectedPersonId)}
+        placeholder="Add a person"
+        emptyText="No people yet. Add one from the menu."
+        options={people.map((item) => ({
+          value: String(item.id),
+          label: item.name,
+        }))}
+        onChange={(value) => setSelectedPersonId(Number(value))}
       />
 
       <Text style={styles.setLabel}>
-        SET {upcoming} · {personLabel(person).toUpperCase()}
+        SET {upcoming}
+        {selectedPerson ? ` · ${selectedPerson.name.toUpperCase()}` : ''}
       </Text>
       <View style={styles.numbers}>
         <NumberField
