@@ -7,14 +7,16 @@ CREATE TABLE IF NOT EXISTS workouts (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   name TEXT NOT NULL,
   normalized_name TEXT NOT NULL UNIQUE,
-  created_at TEXT NOT NULL
+  created_at TEXT NOT NULL,
+  active INTEGER NOT NULL DEFAULT 1
 );
 
 CREATE TABLE IF NOT EXISTS people (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   name TEXT NOT NULL,
   normalized_name TEXT NOT NULL UNIQUE,
-  created_at TEXT NOT NULL
+  created_at TEXT NOT NULL,
+  active INTEGER NOT NULL DEFAULT 1
 );
 
 CREATE TABLE IF NOT EXISTS sessions (
@@ -52,8 +54,17 @@ const LEGACY_PEOPLE = [
 export async function openDatabase(): Promise<SQLiteDatabase> {
   const db = await openDatabaseAsync('repnote.db');
   await db.execAsync(BASE_SCHEMA);
+  await ensureActiveFlag(db, 'workouts');
+  await ensureActiveFlag(db, 'people');
   await migrateSetEntries(db);
   return db;
+}
+
+async function ensureActiveFlag(db: SQLiteDatabase, table: 'workouts' | 'people'): Promise<void> {
+  const columns = await columnNames(db, table);
+  if (!columns.includes('active')) {
+    await db.execAsync(`ALTER TABLE ${table} ADD COLUMN active INTEGER NOT NULL DEFAULT 1`);
+  }
 }
 
 async function columnNames(db: SQLiteDatabase, table: string): Promise<string[]> {

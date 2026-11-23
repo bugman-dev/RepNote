@@ -11,7 +11,7 @@
     },
     "android": {
       "package": "com.repnote.app",
-      "versionCode": 3,
+      "versionCode": 4,
       "adaptiveIcon": {
         "backgroundColor": "#024027",
         "foregroundImage": "./assets/android-icon-foreground.png",
