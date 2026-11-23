@@ -1,13 +1,17 @@
 import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSession } from '../state/SessionStore';
 import { colors, radius } from '../theme';
 
 export function ManageWorkoutsScreen() {
-  const { workouts, addWorkout, showSession, workoutError, reloadWorkouts } = useSession();
+  const { workouts, addWorkout, deleteWorkout, showSession, workoutError, reloadWorkouts } =
+    useSession();
   const [name, setName] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState<{ id: number; name: string } | null>(null);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const countLabel =
     workoutError && workouts.length === 0
       ? 'Workout names could not be loaded'
@@ -26,6 +30,23 @@ export function ManageWorkoutsScreen() {
     }
     setName('');
     setError(null);
+  };
+
+  const confirmDelete = async () => {
+    const pending = pendingDelete;
+    if (!pending || deletingId != null) {
+      return;
+    }
+    setPendingDelete(null);
+    setDeletingId(pending.id);
+    setDeleteError(null);
+    try {
+      await deleteWorkout(pending.id);
+    } catch (reason) {
+      setDeleteError(reason instanceof Error ? reason.message : 'Could not delete that workout name');
+    } finally {
+      setDeletingId(null);
+    }
   };
 
   return (
@@ -75,10 +96,63 @@ export function ManageWorkoutsScreen() {
           <View key={workout.id} style={styles.row}>
             <View style={styles.dot} />
             <Text style={styles.name}>{workout.name}</Text>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`Delete ${workout.name}`}
+              disabled={deletingId != null}
+              onPress={() => setPendingDelete({ id: workout.id, name: workout.name })}
+              hitSlop={6}
+              style={[styles.deleteButton, deletingId === workout.id && styles.deleteBusy]}
+            >
+              <TrashIcon />
+            </Pressable>
           </View>
         ))
       )}
+      {deleteError ? <Text style={styles.error}>{deleteError}</Text> : null}
+      <Modal
+        visible={pendingDelete != null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setPendingDelete(null)}
+      >
+        <Pressable style={styles.backdrop} onPress={() => setPendingDelete(null)}>
+          <Pressable style={styles.confirmSheet} onPress={() => undefined}>
+            <Text style={styles.confirmTitle}>Delete this workout name?</Text>
+            <Text style={styles.confirmBody}>
+              {pendingDelete?.name}
+              {'\n'}Sets already logged keep this name.
+            </Text>
+            <View style={styles.confirmActions}>
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => setPendingDelete(null)}
+                style={styles.confirmCancel}
+              >
+                <Text style={styles.confirmCancelLabel}>Cancel</Text>
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => void confirmDelete()}
+                style={styles.confirmDelete}
+              >
+                <Text style={styles.confirmDeleteLabel}>Delete</Text>
+              </Pressable>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </ScrollView>
+  );
+}
+
+function TrashIcon() {
+  return (
+    <View style={styles.trash}>
+      <View style={styles.trashHandle} />
+      <View style={styles.trashLid} />
+      <View style={styles.trashBody} />
+    </View>
   );
 }
 
@@ -201,5 +275,100 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 16,
     color: colors.ink,
+  },
+  deleteButton: {
+    width: 44,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  deleteBusy: {
+    opacity: 0.4,
+  },
+  trash: {
+    width: 16,
+    height: 18,
+    alignItems: 'center',
+  },
+  trashHandle: {
+    width: 6,
+    height: 2,
+    borderTopWidth: 1.5,
+    borderLeftWidth: 1.5,
+    borderRightWidth: 1.5,
+    borderColor: colors.muted,
+    borderTopLeftRadius: 1,
+    borderTopRightRadius: 1,
+  },
+  trashLid: {
+    width: 14,
+    height: 1.5,
+    borderRadius: 1,
+    backgroundColor: colors.muted,
+    marginTop: 1,
+  },
+  trashBody: {
+    width: 10,
+    height: 11,
+    marginTop: 1,
+    borderLeftWidth: 1.5,
+    borderRightWidth: 1.5,
+    borderBottomWidth: 1.5,
+    borderColor: colors.muted,
+    borderBottomLeftRadius: 2,
+    borderBottomRightRadius: 2,
+  },
+  backdrop: {
+    flex: 1,
+    backgroundColor: colors.overlay,
+    justifyContent: 'flex-end',
+  },
+  confirmSheet: {
+    backgroundColor: colors.surface,
+    borderTopLeftRadius: radius.card,
+    borderTopRightRadius: radius.card,
+    padding: 20,
+  },
+  confirmTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: colors.ink,
+  },
+  confirmBody: {
+    marginTop: 8,
+    fontSize: 15,
+    lineHeight: 22,
+    color: colors.muted,
+  },
+  confirmActions: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 18,
+  },
+  confirmCancel: {
+    flex: 1,
+    minHeight: 48,
+    borderRadius: radius.button,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.greenSoft,
+  },
+  confirmCancelLabel: {
+    color: colors.ink,
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  confirmDelete: {
+    flex: 1,
+    minHeight: 48,
+    borderRadius: radius.button,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.export,
+  },
+  confirmDeleteLabel: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '700',
   },
 });

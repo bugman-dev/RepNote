@@ -84,52 +84,91 @@ export async function listWorkouts(db: SQLiteDatabase): Promise<Workout[]> {
   const rows = await db.getAllAsync<WorkoutRow>(
     `SELECT id, name, normalized_name, created_at
      FROM workouts
+     WHERE active = 1
      ORDER BY id ASC`,
   );
   return rows.map(mapWorkout);
 }
 
 export async function insertWorkout(db: SQLiteDatabase, name: string): Promise<Workout> {
-  const trimmed = name.trim();
-  const createdAt = new Date().toISOString();
-  const result = await db.runAsync(
-    `INSERT INTO workouts (name, normalized_name, created_at) VALUES (?, ?, ?)`,
-    trimmed,
-    normalizeWorkoutName(trimmed),
-    createdAt,
-  );
-  return {
-    id: result.lastInsertRowId,
-    name: trimmed,
-    normalizedName: normalizeWorkoutName(trimmed),
-    createdAt,
-  };
+  return restoreOrInsert(db, 'workouts', name, normalizeWorkoutName(name));
+}
+
+export async function hideWorkout(db: SQLiteDatabase, workoutId: number): Promise<void> {
+  await hideCatalogRow(db, 'workouts', workoutId, 'That workout name is no longer in the list');
 }
 
 export async function listPeople(db: SQLiteDatabase): Promise<Person[]> {
   const rows = await db.getAllAsync<PersonRow>(
     `SELECT id, name, normalized_name, created_at
      FROM people
+     WHERE active = 1
      ORDER BY id ASC`,
   );
   return rows.map(mapPerson);
 }
 
 export async function insertPerson(db: SQLiteDatabase, name: string): Promise<Person> {
+  return restoreOrInsert(db, 'people', name, normalizeName(name));
+}
+
+export async function hidePerson(db: SQLiteDatabase, personId: number): Promise<void> {
+  await hideCatalogRow(db, 'people', personId, 'That person is no longer in the list');
+}
+
+async function restoreOrInsert(
+  db: SQLiteDatabase,
+  table: 'workouts' | 'people',
+  name: string,
+  normalized: string,
+): Promise<Workout> {
   const trimmed = name.trim();
+  const existing = await db.getFirstAsync<WorkoutRow & { active: number }>(
+    `SELECT id, name, normalized_name, created_at, active
+     FROM ${table}
+     WHERE normalized_name = ?`,
+    normalized,
+  );
+  if (existing?.active) {
+    throw new Error(`That ${table === 'workouts' ? 'workout name' : 'person name'} already exists`);
+  }
+  if (existing) {
+    await db.runAsync(`UPDATE ${table} SET name = ?, active = 1 WHERE id = ?`, trimmed, existing.id);
+    return {
+      id: existing.id,
+      name: trimmed,
+      normalizedName: normalized,
+      createdAt: existing.created_at,
+    };
+  }
   const createdAt = new Date().toISOString();
   const result = await db.runAsync(
-    `INSERT INTO people (name, normalized_name, created_at) VALUES (?, ?, ?)`,
+    `INSERT INTO ${table} (name, normalized_name, created_at, active) VALUES (?, ?, ?, 1)`,
     trimmed,
-    normalizeName(trimmed),
+    normalized,
     createdAt,
   );
   return {
     id: result.lastInsertRowId,
     name: trimmed,
-    normalizedName: normalizeName(trimmed),
+    normalizedName: normalized,
     createdAt,
   };
+}
+
+async function hideCatalogRow(
+  db: SQLiteDatabase,
+  table: 'workouts' | 'people',
+  id: number,
+  missingMessage: string,
+): Promise<void> {
+  const result = await db.runAsync(
+    `UPDATE ${table} SET active = 0 WHERE id = ? AND active = 1`,
+    id,
+  );
+  if (result.changes === 0) {
+    throw new Error(missingMessage);
+  }
 }
 
 export async function findSession(

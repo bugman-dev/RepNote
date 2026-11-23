@@ -17,6 +17,8 @@ import {
   addSet as insertSet,
   deleteSet as removeSet,
   findSession,
+  hidePerson,
+  hideWorkout,
   insertPerson,
   insertWorkout,
   listPeople,
@@ -64,7 +66,9 @@ type SessionContextValue = {
   addSet: (values: SetValues) => Promise<void>;
   deleteSet: (setId: number) => Promise<void>;
   addWorkout: (name: string) => Promise<{ error?: string }>;
+  deleteWorkout: (workoutId: number) => Promise<void>;
   addPerson: (name: string) => Promise<{ error?: string }>;
+  deletePerson: (personId: number) => Promise<void>;
   exportSession: () => Promise<{ cancelled: boolean }>;
   reloadSession: () => Promise<void>;
   reloadWorkouts: () => Promise<void>;
@@ -299,7 +303,9 @@ export function SessionProvider({
       const savedName = check.name;
       try {
         const workout = await enqueue(() => insertWorkout(db, savedName));
-        setWorkouts((current) => [...current, workout]);
+        setWorkouts((current) =>
+          current.some((row) => row.id === workout.id) ? current : [...current, workout],
+        );
         setSelectedWorkoutId((current) => current ?? workout.id);
         return {};
       } catch (error) {
@@ -309,6 +315,18 @@ export function SessionProvider({
         }
         return { error: 'Could not save that workout name' };
       }
+    },
+    [db, enqueue, workouts],
+  );
+
+  const deleteWorkout = useCallback(
+    async (workoutId: number) => {
+      const remaining = workouts.filter((workout) => workout.id !== workoutId);
+      await enqueue(() => hideWorkout(db, workoutId));
+      setWorkouts(remaining);
+      setSelectedWorkoutId((current) =>
+        current === workoutId ? (remaining[0]?.id ?? null) : current,
+      );
     },
     [db, enqueue, workouts],
   );
@@ -325,7 +343,9 @@ export function SessionProvider({
       const savedName = check.name;
       try {
         const person = await enqueue(() => insertPerson(db, savedName));
-        setPeople((current) => [...current, person]);
+        setPeople((current) =>
+          current.some((row) => row.id === person.id) ? current : [...current, person],
+        );
         setSelectedPersonId((current) => current ?? person.id);
         return {};
       } catch (error) {
@@ -335,6 +355,18 @@ export function SessionProvider({
         }
         return { error: 'Could not save that person name' };
       }
+    },
+    [db, enqueue, people],
+  );
+
+  const deletePerson = useCallback(
+    async (personId: number) => {
+      const remaining = people.filter((person) => person.id !== personId);
+      await enqueue(() => hidePerson(db, personId));
+      setPeople(remaining);
+      setSelectedPersonId((current) =>
+        current === personId ? (remaining[0]?.id ?? null) : current,
+      );
     },
     [db, enqueue, people],
   );
@@ -382,7 +414,9 @@ export function SessionProvider({
       addSet,
       deleteSet,
       addWorkout,
+      deleteWorkout,
       addPerson,
+      deletePerson,
       exportSession,
       reloadSession,
       reloadWorkouts,
@@ -397,6 +431,8 @@ export function SessionProvider({
       addPerson,
       addSet,
       addWorkout,
+      deletePerson,
+      deleteWorkout,
       closeDrawer,
       deleteSet,
       drawerOpen,
