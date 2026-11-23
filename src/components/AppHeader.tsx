@@ -1,10 +1,11 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import Constants from 'expo-constants';
 import { colors, radius } from '../theme';
 
 export function AppHeader({ onPressMenu }: { onPressMenu: () => void }) {
   return (
     <View style={styles.row}>
-      <Text style={styles.title}>RepNote</Text>
+      <Text style={styles.title}>{Constants.expoConfig?.name}</Text>
       <View style={styles.actions}>
         <View style={styles.pill}>
           <Text style={styles.pillText}>8-day cycle</Text>

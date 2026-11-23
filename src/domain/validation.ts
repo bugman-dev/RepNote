@@ -54,21 +54,39 @@ export function validateSetInput(input: SetInput): {
   return { errors, values: { weightKg, reps, rir } };
 }
 
-export function normalizeWorkoutName(name: string): string {
+export function normalizeName(name: string): string {
   return name.trim().toLocaleLowerCase();
+}
+
+export function normalizeWorkoutName(name: string): string {
+  return normalizeName(name);
+}
+
+function validateNamedEntry(
+  name: string,
+  existingNormalized: string[],
+  noun: string,
+): { name?: string; error?: string } {
+  const trimmed = name.trim();
+  if (!trimmed) {
+    return { error: `Enter a ${noun}` };
+  }
+  if (existingNormalized.includes(normalizeName(trimmed))) {
+    return { error: `That ${noun} already exists` };
+  }
+  return { name: trimmed };
 }
 
 export function validateWorkoutName(
   name: string,
   existingNormalized: string[],
 ): { name?: string; error?: string } {
-  const trimmed = name.trim();
-  if (!trimmed) {
-    return { error: 'Enter a workout name' };
-  }
-  const normalized = normalizeWorkoutName(trimmed);
-  if (existingNormalized.includes(normalized)) {
-    return { error: 'That workout name already exists' };
-  }
-  return { name: trimmed };
+  return validateNamedEntry(name, existingNormalized, 'workout name');
+}
+
+export function validatePersonName(
+  name: string,
+  existingNormalized: string[],
+): { name?: string; error?: string } {
+  return validateNamedEntry(name, existingNormalized, 'person name');
 }

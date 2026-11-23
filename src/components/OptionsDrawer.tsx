@@ -5,10 +5,12 @@ export function OptionsDrawer({
   visible,
   onClose,
   onManageWorkouts,
+  onManagePeople,
 }: {
   visible: boolean;
   onClose: () => void;
   onManageWorkouts: () => void;
+  onManagePeople: () => void;
 }) {
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
@@ -27,16 +29,22 @@ export function OptionsDrawer({
             </Pressable>
           </View>
           <View style={styles.rule} />
-          <Pressable
-            accessibilityRole="button"
-            onPress={onManageWorkouts}
-            style={styles.item}
-          >
-            <Text style={styles.itemLabel}>Manage workout names</Text>
-          </Pressable>
-          <Text style={styles.help}>
-            Add names once; they will appear in the Workout dropdown.
-          </Text>
+          <View style={styles.menu}>
+            <Pressable
+              accessibilityRole="button"
+              onPress={onManageWorkouts}
+              style={styles.item}
+            >
+              <Text style={styles.itemLabel}>Manage workout names</Text>
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              onPress={onManagePeople}
+              style={styles.item}
+            >
+              <Text style={styles.itemLabel}>Manage people</Text>
+            </Pressable>
+          </View>
         </View>
       </View>
     </Modal>
@@ -89,6 +97,9 @@ const styles = StyleSheet.create({
     marginTop: 16,
     marginBottom: 18,
   },
+  menu: {
+    gap: 10,
+  },
   item: {
     backgroundColor: colors.background,
     borderRadius: radius.field,
@@ -99,11 +110,5 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
     color: colors.ink,
-  },
-  help: {
-    marginTop: 14,
-    color: colors.muted,
-    fontSize: 15,
-    lineHeight: 22,
   },
 });

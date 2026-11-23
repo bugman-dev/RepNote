@@ -4,11 +4,14 @@ import { useSession } from '../state/SessionStore';
 import { colors, radius } from '../theme';
 
 export function ManageWorkoutsScreen() {
-  const { workouts, addWorkout, showSession } = useSession();
+  const { workouts, addWorkout, showSession, workoutError, reloadWorkouts } = useSession();
   const [name, setName] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const countLabel = `${workouts.length} workout ${workouts.length === 1 ? 'name' : 'names'} available`;
+  const countLabel =
+    workoutError && workouts.length === 0
+      ? 'Workout names could not be loaded'
+      : `${workouts.length} workout ${workouts.length === 1 ? 'name' : 'names'} available`;
 
   const onAdd = async () => {
     if (saving) {
@@ -57,8 +60,16 @@ export function ManageWorkoutsScreen() {
       <Text style={styles.count}>{countLabel}</Text>
       <View style={styles.rule} />
       <Text style={styles.listHeading}>Saved workout names</Text>
+      {workoutError ? (
+        <View style={styles.errorRow}>
+          <Text style={styles.error}>{workoutError}</Text>
+          <Pressable accessibilityRole="button" onPress={() => void reloadWorkouts()}>
+            <Text style={styles.retry}>Try again</Text>
+          </Pressable>
+        </View>
+      ) : null}
       {workouts.length === 0 ? (
-        <Text style={styles.empty}>Names you add will show up here.</Text>
+        workoutError ? null : <Text style={styles.empty}>Names you add will show up here.</Text>
       ) : (
         workouts.map((workout) => (
           <View key={workout.id} style={styles.row}>
@@ -128,6 +139,15 @@ const styles = StyleSheet.create({
     marginTop: 8,
     color: colors.danger,
     fontSize: 14,
+  },
+  errorRow: {
+    marginBottom: 12,
+    gap: 6,
+  },
+  retry: {
+    color: colors.green,
+    fontSize: 14,
+    fontWeight: '700',
   },
   button: {
     marginTop: 16,
