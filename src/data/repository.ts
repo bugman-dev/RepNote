@@ -182,3 +182,43 @@ export async function addSet(
     );
   });
 }
+
+export async function deleteSet(db: SQLiteDatabase, setId: number): Promise<void> {
+  await db.withTransactionAsync(async () => {
+    const row = await db.getFirstAsync<{
+      session_id: number;
+      workout_id: number;
+      person: string;
+    }>(
+      `SELECT session_id, workout_id, person FROM set_entries WHERE id = ?`,
+      setId,
+    );
+    if (!row) {
+      throw new Error('That set is no longer on this day');
+    }
+    await db.runAsync(`DELETE FROM set_entries WHERE id = ?`, setId);
+    const remaining = await db.getAllAsync<{ id: number }>(
+      `SELECT id
+       FROM set_entries
+       WHERE session_id = ? AND workout_id = ? AND person = ?
+       ORDER BY set_number ASC, id ASC`,
+      row.session_id,
+      row.workout_id,
+      row.person,
+    );
+    for (let index = 0; index < remaining.length; index += 1) {
+      await db.runAsync(
+        `UPDATE set_entries SET set_number = ? WHERE id = ?`,
+        -(index + 1),
+        remaining[index].id,
+      );
+    }
+    for (let index = 0; index < remaining.length; index += 1) {
+      await db.runAsync(
+        `UPDATE set_entries SET set_number = ? WHERE id = ?`,
+        index + 1,
+        remaining[index].id,
+      );
+    }
+  });
+}

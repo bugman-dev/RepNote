@@ -13,7 +13,14 @@ import { todayIso } from '../domain/dates';
 import { exportFileName, formatSessionExport } from '../domain/formatExport';
 import type { Person, SetEntry, SetValues, Workout } from '../domain/types';
 import { validateWorkoutName } from '../domain/validation';
-import { addSet as insertSet, findSession, insertWorkout, listSets, listWorkouts } from '../data/repository';
+import {
+  addSet as insertSet,
+  deleteSet as removeSet,
+  findSession,
+  insertWorkout,
+  listSets,
+  listWorkouts,
+} from '../data/repository';
 import { saveTextFile } from '../export/saveTextFile';
 
 type Screen = 'session' | 'workouts';
@@ -50,6 +57,7 @@ type SessionContextValue = {
   setSelectedWorkoutId: (workoutId: number) => void;
   setPerson: (person: Person) => void;
   addSet: (values: SetValues) => Promise<void>;
+  deleteSet: (setId: number) => Promise<void>;
   addWorkout: (name: string) => Promise<{ error?: string }>;
   exportSession: () => Promise<{ cancelled: boolean }>;
   reloadSession: () => Promise<void>;
@@ -214,6 +222,21 @@ export function SessionProvider({
     [db, enqueue, loadSession, person, routineDay, selectedWorkoutId, sessionDate],
   );
 
+  const deleteSet = useCallback(
+    async (setId: number) => {
+      const day = routineDay;
+      const date = sessionDate;
+      await enqueue(async () => {
+        await removeSet(db, setId);
+        const current = selection.current;
+        if (current.routineDay === day && current.sessionDate === date) {
+          await loadSession(day, date);
+        }
+      });
+    },
+    [db, enqueue, loadSession, routineDay, sessionDate],
+  );
+
   const addWorkout = useCallback(
     async (name: string) => {
       const check = validateWorkoutName(
@@ -275,6 +298,7 @@ export function SessionProvider({
       setSelectedWorkoutId,
       setPerson,
       addSet,
+      deleteSet,
       addWorkout,
       exportSession,
       reloadSession,
@@ -287,6 +311,7 @@ export function SessionProvider({
     [
       addSet,
       addWorkout,
+      deleteSet,
       closeDrawer,
       drawerOpen,
       exportSession,
